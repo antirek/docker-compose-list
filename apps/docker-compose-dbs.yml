@@ -1,0 +1,4 @@
+version: '2'
+services:
+  mongodb:
+    image: antirek/asterisk17-lua:19.12.1

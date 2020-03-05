@@ -1,0 +1,22 @@
+{
+  "name": "docker-compose-list",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/antirek/docker-compose-list.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/antirek/docker-compose-list/issues"
+  },
+  "homepage": "https://github.com/antirek/docker-compose-list#readme",
+  "dependencies": {
+    "js-yaml": "^3.13.1"
+  }
+}
