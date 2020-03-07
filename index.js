@@ -1,6 +1,7 @@
 const yaml = require('js-yaml');
 const fs   = require('fs');
 const path = require('path');
+const matcher = require('matcher');
 
 const listService = (filepath) => {
   const listServices = [];
@@ -23,25 +24,36 @@ const listService = (filepath) => {
   return listServices;
 }
 
-const testFolder = './apps/';
-
 const getFilepaths = (folder) => {
   const filepaths = [];
   fs.readdirSync(folder).forEach(file => {
-    filepaths.push(path.join(testFolder, file))
+    //console.log('ff', file);
+    if (matcher.isMatch(file, 'docker-compose*.yml')) {
+      filepaths.push(path.join(folder, file))
+    }
   });
   return filepaths;
 }
 
-const filepaths = getFilepaths(testFolder);
-let services = [];
+const getServices =  (folder) => {
+  const filepaths = getFilepaths(folder);
+  let services = [];
 
-filepaths.forEach(filepath => {
-  console.log(filepath);
-  const servicesInFile = listService(filepath);
-  console.log('s', servicesInFile)
-  services = services.concat(servicesInFile);
-  
-});
+  filepaths.forEach(filepath => {
+    //console.log(filepath);
+    const servicesInFile = listService(filepath);
+    //console.log('s', servicesInFile)
+    services = services.concat(servicesInFile);
+  });
+  return services;
+}
 
-console.log('services', services);
+/*
+const testFolder = './apps/';
+console.log('services', getServices(testFolder));
+
+*/
+
+module.exports = {
+  getServices,
+}
