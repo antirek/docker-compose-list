@@ -1,0 +1,23 @@
+html
+  head
+    title Services
+    link(rel='stylesheet', type='text/css', href='https://cdn.datatables.net/1.10.20/css/jquery.dataTables.css')
+    script(type='text/javascript', src='https://code.jquery.com/jquery-3.4.1.js')
+    script(type='text/javascript', charset='utf8', src='https://cdn.datatables.net/1.10.20/js/jquery.dataTables.js')
+    
+  body
+    h3 Services
+    table#table
+      thead
+        tr
+          th host
+          th app
+          th service
+
+    script(type='text/javascript').
+      $(document).ready( function () {
+        $('#table').DataTable({
+          "ajax": '/services',
+          "paging": false,
+        });
+      });
