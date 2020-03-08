@@ -1,59 +1,89 @@
-const yaml = require('js-yaml');
-const fs   = require('fs');
-const path = require('path');
-const matcher = require('matcher');
 
-const listService = (filepath) => {
-  const listServices = [];
-  try {
-    const doc = yaml.safeLoad(fs.readFileSync(filepath, 'utf8'));
-    // console.log(doc);
+const hg = require("hg");
+const config = require('config');
 
-    const dockerCoomposeRef = doc;
+const fs = require('fs')
+const { getServices } = require('./fromDockerCompose');
 
-    for (let key in dockerCoomposeRef.services) {
-      listServices.push({
-        name: key,
-        filepath,
+const getDirectories = (source) => {
+  return fs.readdirSync(source, { withFileTypes: true })
+    .filter(dirent => dirent.isDirectory())
+    .map(dirent => dirent.name);
+};
+
+const HGRepo = hg.HGRepo;
+const destPath = config.path;
+
+const repo = new HGRepo(destPath);
+
+const branches = config.branches;
+
+repo.pull(["-u"], function(err, output) {
+    if (err) {
+        throw err;
+    }
+
+    output.forEach(function(line) {
+      console.log(line.body);
+    });    
+
+    const prepareRepo = (repo, branch) => {
+      return new Promise((resolve, reject) => {
+        repo.update(["-C", "-r", branch], (err, output) => {
+          console.log(err, output)
+          if(err) reject(err);
+          resolve();
+        });
       });
-    }
-  } catch (e) {
-    console.log(e);
-  }
+    };
 
-  return listServices;
-}
+    const getServicesOnHost = (host)=> {
+      let services = [];
+      const d = destPath + '/apps/';
+      console.log('dest path / apps', d);
 
-const getFilepaths = (folder) => {
-  const filepaths = [];
-  fs.readdirSync(folder).forEach(file => {
-    //console.log('ff', file);
-    if (matcher.isMatch(file, 'docker-compose*.yml')) {
-      filepaths.push(path.join(folder, file))
-    }
-  });
-  return filepaths;
-}
+      const appsDirs = getDirectories(d);
+      console.log('appsDirs', appsDirs);
 
-const getServices =  (folder) => {
-  const filepaths = getFilepaths(folder);
-  let services = [];
+      for (let i = 0; i < appsDirs.length; i++ ) {
+        const s = getServices(destPath + '/apps/' + appsDirs[i] + '/');
+        const ps = s.map(item=>{
+          item.app = appsDirs[i];
+          item.host = host;
+          return item;
+        })
+        services = services.concat(ps);
+      }
 
-  filepaths.forEach(filepath => {
-    //console.log(filepath);
-    const servicesInFile = listService(filepath);
-    //console.log('s', servicesInFile)
-    services = services.concat(servicesInFile);
-  });
-  return services;
-}
+      // console.log('pppp ', services);
+      return services;
+    };
 
-/*
-const testFolder = './apps/';
-console.log('services', getServices(testFolder));
+    const getServicesFromRepo = (host) => {
+      return prepareRepo(repo, host)
+        .then(() => {
+          const r = getServicesOnHost(host);
+          console.log('host', host, 'count', r.length);
+          return r;
+        });
+    };
 
-*/
+    const run = async (branches) => {
+      let qy = [];
 
-module.exports = {
-  getServices,
-}
+      for (let q = 0; q < branches.length; q++) {
+        const host = branches[q].branch;
+        const rt = await getServicesFromRepo(host);
+
+        qy = qy.concat(rt);
+      }
+
+      return Promise.resolve(qy)
+    };
+
+    run(branches).then(d => {
+      console.log('data items:', d.length);
+      fs.writeFileSync(config.outputFile, JSON.stringify(d, false, 2));
+    });
+});
+
