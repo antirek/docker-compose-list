@@ -1,8 +1,7 @@
-
 const hg = require("hg");
 const config = require('config');
-
-const fs = require('fs')
+const fs = require('fs');
+const cron = require('node-cron');
 const { getServices } = require('./fromDockerCompose');
 
 const getDirectories = (source) => {
@@ -14,76 +13,75 @@ const getDirectories = (source) => {
 const HGRepo = hg.HGRepo;
 const destPath = config.path;
 
-const repo = new HGRepo(destPath);
-
-const branches = config.branches;
-
-repo.pull(["-u"], function(err, output) {
-    if (err) {
-        throw err;
-    }
-
-    output.forEach(function(line) {
-      console.log(line.body);
-    });    
-
-    const prepareRepo = (repo, branch) => {
-      return new Promise((resolve, reject) => {
-        repo.update(["-C", "-r", branch], (err, output) => {
-          console.log(err, output)
-          if(err) reject(err);
-          resolve();
-        });
+const pullRepo = (repo) => {
+  return new Promise((resolve, reject) => {
+    repo.pull(["-u"], function(err, output) {
+      if (err) reject(err);
+      output.forEach(function(line) {
+        console.log(line.body);
       });
-    };
-
-    const getServicesOnHost = (host)=> {
-      let services = [];
-      const d = destPath + '/apps/';
-      console.log('dest path / apps', d);
-
-      const appsDirs = getDirectories(d);
-      console.log('appsDirs', appsDirs);
-
-      for (let i = 0; i < appsDirs.length; i++ ) {
-        const s = getServices(destPath + '/apps/' + appsDirs[i] + '/');
-        const ps = s.map(item=>{
-          item.app = appsDirs[i];
-          item.host = host;
-          return item;
-        })
-        services = services.concat(ps);
-      }
-
-      // console.log('pppp ', services);
-      return services;
-    };
-
-    const getServicesFromRepo = (host) => {
-      return prepareRepo(repo, host)
-        .then(() => {
-          const r = getServicesOnHost(host);
-          console.log('host', host, 'count', r.length);
-          return r;
-        });
-    };
-
-    const run = async (branches) => {
-      let qy = [];
-
-      for (let q = 0; q < branches.length; q++) {
-        const host = branches[q].branch;
-        const rt = await getServicesFromRepo(host);
-
-        qy = qy.concat(rt);
-      }
-
-      return Promise.resolve(qy)
-    };
-
-    run(branches).then(d => {
-      console.log('data items:', d.length);
-      fs.writeFileSync(config.outputFile, JSON.stringify(d, false, 2));
+      resolve(repo)
     });
+  });
+};
+
+const updateRepo = (repo, branch) => {
+  return new Promise((resolve, reject) => {
+    repo.update(["-C", "-r", branch], (err, output) => {
+      console.log(err, output)
+      if(err) reject(err);
+      resolve(repo);
+    });
+  });
+};
+
+const getServicesOnHost = (host)=> {
+  let services = [];
+  const d = destPath + '/apps/';
+  console.log('dest path / apps', d);
+
+  const appsDirs = getDirectories(d);
+  console.log('appsDirs', appsDirs);
+
+  for (let i = 0; i < appsDirs.length; i++ ) {
+    const s = getServices(destPath + '/apps/' + appsDirs[i] + '/');
+    const ps = s.map(item=>{
+      item.app = appsDirs[i];
+      item.host = host;
+      return item;
+    })
+    services = services.concat(ps);
+  }
+  return services;
+};
+
+const processIt = async (repo, branches) => {
+  let list = [];
+
+  for (let i = 0; i < branches.length; i++) {
+    const host = branches[i].branch;
+
+    await updateRepo(repo, host);
+    const s = await getServicesOnHost(host);
+    console.log('host', host, 'count', s.length);
+
+    list = list.concat(s);
+  }
+
+  return Promise.resolve(list)
+};
+
+const task = async () => {
+  const repo = await pullRepo(new HGRepo(destPath));
+  const list = await processIt(repo, config.branches);
+
+  console.log('data items:', list.length);
+  fs.writeFileSync(config.outputFile, JSON.stringify(list, false, 2));
+}
+
+cron.schedule('*/5 * * * *', async () => {
+  console.log('start task');
+  await task();
 });
 
+console.log('start process');
