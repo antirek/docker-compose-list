@@ -17,7 +17,7 @@
   },
   "homepage": "https://github.com/antirek/docker-compose-list#readme",
   "dependencies": {
-    "config": "^3.3.0",
+    "config": "^3.3.8",
     "express": "^4.17.1",
     "hg": "^0.3.3",
     "js-yaml": "^3.13.1",
